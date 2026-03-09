@@ -62,9 +62,9 @@ def allCommands(message = 1):
             PlayYoutube(query)
         
         elif "send message" in query or "phone call" in query or "video call" in query:
-            from engine.feature import findContact, whatsApp, makeCall, sendMessage
-            contact_no, name = findContact(query)
-            if(contact_no != 0):
+              from engine.feature import findContact, whatsApp, makeCall
+              contact_no, name = findContact(query)
+              if(contact_no != 0):
                 speak("Which mode you want to use whatsapp or mobile")
                 preferance = takecommand()
                 print(preferance)
@@ -73,7 +73,7 @@ def allCommands(message = 1):
                     if "send message" in query or "send sms" in query: 
                         speak("what message to send")
                         message = takecommand()
-                        sendMessage(message, contact_no, name)
+                        # sendMessage(message, contact_no, name)
                     elif "phone call" in query:
                         makeCall(name, contact_no)
                     else:
