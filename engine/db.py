@@ -14,7 +14,7 @@ cursor = con.cursor()
 query = "CREATE TABLE IF NOT EXISTS web_command(id integer primary key, name VARCHAR(100), url VARCHAR(1000))"
 cursor.execute(query)
 
-query = "INSERT INTO web_command VALUES (null,'filmyfly', 'https://1filmyfly.org/')"
+query = "INSERT INTO web_command VALUES (null,'hdhub4u', 'https://new4.hdhub4u.fo/?utm=mn')"
 cursor.execute(query)
 con.commit()
 
@@ -26,11 +26,11 @@ con.commit()
 # print(results[0][0])
 
 
-# cursor.execute('''CREATE TABLE IF NOT EXISTS contacts (id integer primary key, name VARCHAR(200), mobile_no VARCHAR(255), email VARCHAR(255) NULL, address VARCHAR(255) NULL)''')
+#cursor.execute('''CREATE TABLE IF NOT EXISTS contacts (id integer primary key, name VARCHAR(200), mobile_no VARCHAR(255), email VARCHAR(255) NULL, address VARCHAR(255) NULL)''')
 
 
 
-# desired_columns_indices = [0, 30]
+# desired_columns_indices = [0, 18]
 
 
 # with open('contacts.csv', 'r', encoding='utf-8') as csvfile:
@@ -43,11 +43,11 @@ con.commit()
 # con.commit()
 # con.close()
 
-# query = "INSERT INTO contacts VALUES (null,'pawan', '1234567890', 'null')"
+# query = "INSERT INTO contacts VALUES (null,'siddharth maaurya', '9721945124', 'null')"
 # cursor.execute(query)
 # con.commit()
 
-# query = 'kunal'
+# query = 'sidhu'
 # query = query.strip().lower()
 
 # cursor.execute("SELECT mobile_no FROM contacts WHERE LOWER(name) LIKE ? OR LOWER(name) LIKE ?", ('%' + query + '%', query + '%'))
@@ -60,3 +60,19 @@ con.commit()
 
 # Add Column in contacts table
 # cursor.execute("ALTER TABLE contacts ADD COLUMN address VARCHAR(255)")
+
+con = sqlite3.connect("jarvis.db")
+cursor = con.cursor()
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS memory(
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+question TEXT,
+answer TEXT
+)
+""")
+
+con.commit()
+con.close()
+
+print("Memory table created")

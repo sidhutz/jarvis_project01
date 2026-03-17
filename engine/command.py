@@ -60,6 +60,18 @@ def allCommands(message = 1):
         elif "on youtube" in query:
             from engine.feature import PlayYoutube
             PlayYoutube(query)
+
+        elif "search" in query or "google" in query:
+            from engine.feature import searchGoogle
+            searchGoogle(query)
+
+        elif "remember" in query:
+            from engine.feature import rememberSomething
+            rememberSomething(query)
+
+        elif "what is" in query:
+            from engine.feature import recallMemory
+            recallMemory(query)
         
         elif "send message" in query or "phone call" in query or "video call" in query:
               from engine.feature import findContact, whatsApp, makeCall
@@ -91,6 +103,14 @@ def allCommands(message = 1):
                         message = 'video call'
                                         
                     whatsApp(contact_no, query, message, name)
+
+                elif "remember" in query:
+                        from engine.feature import rememberSomething
+                        rememberSomething(query)
+
+                elif "what is" in query:
+                    from engine.feature import recallMemory
+                    recallMemory(query)
 
         else:
                 from engine.feature import chatBot

@@ -182,3 +182,69 @@ def makeCall(name, mobileNo):
     speak("Calling "+name)
     command = 'adb shell am start -a android.intent.action.CALL -d tel:'+mobileNo
     os.system(command)
+
+def searchGoogle(query):
+    import webbrowser
+    
+    query = query.replace("search", "")
+    query = query.replace("google", "")
+    query = query.replace("on google", "")
+    query = query.strip()
+
+    speak("Searching " + query + " on Google")
+
+    url = "https://www.google.com/search?q=" + query
+    webbrowser.open(url)
+
+memory = {}
+
+import sqlite3
+from engine.command import speak
+
+def rememberSomething(query):
+
+    query = query.replace("remember", "")
+    query = query.replace("jarvis", "")
+    query = query.strip()
+
+    if " is " in query:
+        question, answer = query.split(" is ",1)
+
+        con = sqlite3.connect("jarvis.db")
+        cursor = con.cursor()
+
+        cursor.execute(
+        "INSERT INTO memory(question,answer) VALUES (?,?)",
+        (question.strip(), answer.strip())
+        )
+
+        con.commit()
+        con.close()
+
+        speak("I will remember that " + question + " is " + answer)
+
+
+def recallMemory(query):
+
+    from engine.command import speak
+    import sqlite3
+
+    query = query.replace("jarvis","")
+    query = query.replace("what is","")
+    query = query.strip()
+
+    con = sqlite3.connect("jarvis.db")
+    cursor = con.cursor()
+
+    cursor.execute(
+    "SELECT answer FROM memory WHERE question=?",
+    (query,)
+    )
+
+    result = cursor.fetchone()
+    con.close()
+
+    if result:
+        speak(query + " is " + result[0])
+    else:
+        speak("I don't remember that yet")
