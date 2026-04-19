@@ -1,7 +1,7 @@
 window.addEventListener("load", windowLoadHandler, false);
 var sphereRad = 140;
 var radius_sp = 1;
-//for debug messages
+
 var Debugger = function () { };
 Debugger.log = function (message) {
 	try {
@@ -350,3 +350,49 @@ $(function () {
 		}
 	});
 });
+
+function copyCode(btn) {
+    let code = btn.nextElementSibling.innerText;
+    navigator.clipboard.writeText(code);
+
+    btn.innerText = "Copied!";
+    setTimeout(() => {
+        btn.innerText = "Copy";
+    }, 3000);
+}
+
+
+
+// ================== CHAT HISTORY LOAD ==================
+
+async function loadChatHistory() {
+    try {
+        let chats = await eel.loadHistory()();
+
+        console.log("Chats:", chats);
+
+        let chatBox = document.getElementById("chat-canvas-body");
+
+        chats.forEach(chat => {
+            if (chat.message) {
+                let div1 = document.createElement("div");
+                div1.innerHTML = `<div class="sender_message">${chat.message}</div>`;
+                chatBox.appendChild(div1);
+            }
+
+            if (chat.response) {
+                let div2 = document.createElement("div");
+                div2.innerHTML = `<div class="receiver_message">${chat.response}</div>`;
+                chatBox.appendChild(div2);
+            }
+        });
+
+    } catch (err) {
+        console.log("History error:", err);
+    }
+}
+
+// 🚀 सबसे important delay
+setTimeout(() => {
+    loadChatHistory();
+}, 4000);

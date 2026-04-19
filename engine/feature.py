@@ -6,6 +6,7 @@ import struct
 import subprocess
 import time
 import webbrowser
+from groq import Groq
 
 from playsound import playsound
 import eel
@@ -16,8 +17,6 @@ from engine.command import speak
 from engine.config import ASSISTEANT_NAME
 import pywhatkit as kit
 from engine.helper import extract_yt_term, remove_words
-
-from hugchat import hugchat
 
 con = sqlite3.connect("jarvis.db")
 cursor = con.cursor()
@@ -167,15 +166,25 @@ def whatsApp(mobile_no, message, flag, name):
     pyautogui.hotkey('enter')
     speak(jarvis_message)
 
+client = Groq(api_key="REMOVED_GROQ_API_KEY")
+
 def chatBot(query):
-    user_input = query.lower()
-    chatbot = hugchat.ChatBot(cookie_path="engine\cookie.json")
-    id = chatbot.new_conversation()
-    chatbot.change_conversation(id)
-    response =  chatbot.chat(user_input)
-    print(response)
-    speak(response)
-    return response
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+            {"role": "system", "content": "You are Jarvis AI. If the user asks for code, respond ONLY with clean code inside proper code blocks using triple backticks. Do NOT add explanations, headings, descriptions, or extra text. Only code."},
+            {"role": "user", "content": query}
+            ]
+        )
+
+        reply = response.choices[0].message.content
+        print(reply)
+        return reply
+
+    except Exception as e:
+        speak("Error connecting to AI")
+        print(e)
 
 def makeCall(name, mobileNo):
     mobileNo =mobileNo.replace(" ", "")
@@ -248,3 +257,20 @@ def recallMemory(query):
         speak(query + " is " + result[0])
     else:
         speak("I don't remember that yet")
+
+def getWeather(city="lucknow"):
+    import requests
+
+    api_key = "REMOVED_OPENWEATHER_API_KEY"   
+    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
+
+    try:
+        data = requests.get(url).json()
+
+        temp = data["main"]["temp"]
+        desc = data["weather"][0]["description"]
+
+        speak(f"Temperature in {city} is {temp} degree Celsius with {desc}")
+
+    except:
+        speak("Unable to fetch weather")

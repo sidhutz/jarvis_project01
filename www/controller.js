@@ -26,21 +26,40 @@ $(document).ready(function () {
     }
 
     eel.expose(receiverText)
-    function receiverText(message) {
+function receiverText(message, is_code=false) {
 
-        var chatBox = document.getElementById("chat-canvas-body");
-        if (message.trim() !== "") {
-            chatBox.innerHTML += `<div class="row justify-content-start mb-4">
-            <div class = "width-size">
-            <div class="receiver_message">${message}</div>
+    var chatBox = document.getElementById("chat-canvas-body");
+
+    let div = document.createElement("div");
+    div.className = "row justify-content-start mb-4";
+
+    let content = "";
+
+    if (is_code) {
+        // remove ```
+        let code = message.replace(/```/g, "");
+
+        content = `
+        <div class="width-size">
+            <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                <pre><code>${code}</code></pre>
             </div>
         </div>`;
-
-
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
+    } else {
+        content = `
+        <div class="width-size">
+            <div class="receiver_message">
+                ${message}
+                <button class="speak-btn" onclick="speakText(this)">🔊</button>
+            </div>
+        </div>`;
     }
+
+    div.innerHTML = content;
+    chatBox.appendChild(div);
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
      eel.expose(hideLoader)
     function hideLoader() {
 

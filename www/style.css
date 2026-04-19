@@ -272,3 +272,46 @@ svg {
     transform: rotate(360deg);
   }
 }
+
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 0 30px rgba(0, 150, 255, 0.3);
+}
+
+.code-block {
+  background: #0d1117;
+  border-radius: 10px;
+  padding: 15px;
+  position: relative;
+  border: 1px solid #30363d;
+  box-shadow: 0 0 15px rgba(0,255,255,0.2);
+}
+
+.code-block pre {
+  margin: 0;
+  color: #c9d1d9;
+  font-family: Consolas, monospace;
+  font-size: 14px;
+  overflow-x: auto;
+}
+
+.copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: transparent;
+  border: 1px solid #00f7ff;
+  color: #00f7ff;
+  padding: 3px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.copy-btn:hover {
+  background: #00f7ff;
+  color: black;
+}
