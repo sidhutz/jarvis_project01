@@ -22,6 +22,49 @@ con = sqlite3.connect("jarvis.db")
 cursor = con.cursor()
 
 
+def load_local_env():
+    env_path = ".env"
+    if not os.path.exists(env_path):
+        return
+
+    with open(env_path, "r", encoding="utf-8") as env_file:
+        for line in env_file:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+load_local_env()
+
+
+def extract_city_from_weather_query(query):
+    query = (query or "").lower().strip()
+    query = re.sub(rf"\b{re.escape(ASSISTEANT_NAME.lower())}\b", "", query)
+
+    patterns = [
+        r"weather\s+(?:in|of|at|for)\s+([a-zA-Z\s]+)",
+        r"(?:what(?:'s| is)?\s+the\s+)?weather\s+([a-zA-Z\s]+)",
+        r"([a-zA-Z\s]+)\s+weather",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, query)
+        if match:
+            city = re.sub(r"\b(today|now|right now|please)\b", "", match.group(1), flags=re.IGNORECASE)
+            city = re.sub(r"\s+", " ", city).strip(" ?.,")
+            if city:
+                return city.title()
+
+    cleaned_query = re.sub(r"\b(weather|ka|ki|kya|hai|bataye|batao|please|jarvis)\b", "", query)
+    cleaned_query = re.sub(r"\s+", " ", cleaned_query).strip(" ?.,")
+    if cleaned_query:
+        return cleaned_query.title()
+
+    return None
+
+
 @eel.expose
 def playAssistantSound():
     music_dir = "www\\assets\\audio\\start_sound.mp3"
@@ -166,19 +209,36 @@ def whatsApp(mobile_no, message, flag, name):
     pyautogui.hotkey('enter')
     speak(jarvis_message)
 
-client = Groq(api_key="REMOVED_GROQ_API_KEY")
+client = None
 
 def chatBot(query):
     try:
+        global client
+        api_key = os.getenv("GROQ_API_KEY")
+
+        if not api_key:
+            speak("Groq API key is missing")
+            return
+
+        if client is None:
+            client = Groq(api_key=api_key)
+
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
-            {"role": "system", "content": "You are Jarvis AI. If the user asks for code, respond ONLY with clean code inside proper code blocks using triple backticks. Do NOT add explanations, headings, descriptions, or extra text. Only code."},
+            {"role": "system", "content": "You are Jarvis AI. If the user asks for code, respond ONLY with clean code inside one proper triple-backtick code block. Do not add explanations, headings, markdown outside the code block, or extra text."},
             {"role": "user", "content": query}
             ]
         )
 
         reply = response.choices[0].message.content
+        code_words = ["code", "program", "script", "function", "html", "css", "javascript", "python", "java", "c++"]
+
+        if any(word in query.lower() for word in code_words):
+            code_match = re.search(r"```[a-zA-Z0-9_+-]*\s*([\s\S]*?)```", reply)
+            if code_match:
+                reply = "```\n" + code_match.group(1).strip() + "\n```"
+
         print(reply)
         return reply
 
@@ -258,19 +318,42 @@ def recallMemory(query):
     else:
         speak("I don't remember that yet")
 
-def getWeather(city="lucknow"):
+def getWeather(city):
     import requests
 
-    api_key = "REMOVED_OPENWEATHER_API_KEY"   
-    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
+    api_key = os.getenv("OPENWEATHER_API_KEY")
+
+    if not api_key:
+        speak("OpenWeather API key is missing")
+        return
+
+    if not city:
+        speak("Please tell me the city name for the weather update")
+        return
+
+    url = "https://api.openweathermap.org/data/2.5/weather"
+    params = {
+        "q": city,
+        "appid": api_key,
+        "units": "metric",
+    }
 
     try:
-        data = requests.get(url).json()
+        response = requests.get(url, params=params, timeout=10)
+        data = response.json()
+
+        if response.status_code != 200 or "main" not in data or "weather" not in data:
+            speak(f"I could not find weather details for {city}")
+            return
 
         temp = data["main"]["temp"]
+        feels_like = data["main"].get("feels_like")
         desc = data["weather"][0]["description"]
 
-        speak(f"Temperature in {city} is {temp} degree Celsius with {desc}")
+        if feels_like is not None:
+            speak(f"Temperature in {city} is {temp} degree Celsius with {desc}. It feels like {feels_like} degree Celsius.")
+        else:
+            speak(f"Temperature in {city} is {temp} degree Celsius with {desc}")
 
-    except:
-        speak("Unable to fetch weather")
+    except Exception:
+        speak("Unable to fetch weather right now")
