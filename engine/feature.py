@@ -116,8 +116,13 @@ def hotword():
     audio_stream = None
 
     try:
+        access_key = os.getenv("PICOVOICE_ACCESS_KEY")
+        if not access_key:
+            print("Picovoice access key is missing")
+            return
+
         porcupine = pvporcupine.create(
-            access_key="WwbJY6qtEGIWEYFB2+vizVOApa2cMVBz17HbgUTFzCkwhGg73DkCZg==",
+            access_key=access_key,
             keywords=["jarvis", "alexa"],
             sensitivities=[0.8, 0.8]
         )
