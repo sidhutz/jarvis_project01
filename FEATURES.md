@@ -97,6 +97,17 @@ ADB and device setup are required for this feature.
 - The assistant starts only after successful face authentication.
 - Face sample/trainer scripts are available under `engine/auth/`.
 
+## Pattern Lock
+
+- Android-style 3x3 pattern lock is shown after face authentication.
+- First-time users must set and confirm a pattern before entering Jarvis.
+- Existing users must draw the saved pattern to unlock Jarvis.
+- Pattern can be changed from the settings button after unlocking.
+- Pattern can be removed from the settings button after unlocking.
+- Change and remove actions require the current pattern first.
+- Pattern data is stored locally in `pattern_lock.json` as a salted SHA-256 hash.
+- `pattern_lock.json` is ignored by Git and should not be uploaded.
+
 ## Interface
 
 - Frontend files are in `www/`.

@@ -9,5 +9,6 @@ build/
 dist/
 *.spec
 jarvis.db
+pattern_lock.json
 *.git/
 
