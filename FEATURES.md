@@ -1,135 +1,71 @@
-# Jarvis AI Features And Interactions
+# JARVIS Feature Guide
 
-## Overview
+## Jarvis kya kar sakta hai?
 
-Jarvis AI is a Windows desktop voice assistant with a web-based interface powered by Eel. It supports voice input, text chat, face authentication, AI replies, app launching, web search, YouTube playback, weather updates, memory recall, WhatsApp actions, mobile calls, and chat history.
+Jarvis ek Windows AI assistant hai jo aapki voice ya typed command ko samajhkar everyday tasks ko jaldi complete karta hai. Neeche har feature ko simple language mein explain kiya gaya hai.
 
-## Main Interactions
+## 1. Voice Control
 
-- Voice command input through the microphone.
-- Text command input from the web interface.
-- Assistant replies shown in the interface.
-- Optional speech output through Windows SAPI voice.
-- Chat history loading from local/cloud storage.
-- Face authentication before the main assistant UI opens.
-- Hotword listening with Picovoice Porcupine using the keywords `jarvis` and `alexa`.
+Mic button dabaiye aur normal language mein boliye. Jarvis aapki command sunega aur answer ya action karega.
 
-## AI Chat
+**Try:** `open chrome` · `what time is it`
 
-- Uses Groq chat completions.
-- Model configured in the code: `llama-3.3-70b-versatile`.
-- General questions are sent to the AI chatbot.
-- Code-related questions are cleaned so the answer is returned as a single code block when possible.
-- Requires `GROQ_API_KEY` in `.env`.
+## 2. AI Chat
 
-## Commands
+Kisi bhi topic par sawal poochhiye—study, ideas, coding, explanations, ya general help. Jarvis AI reply chat history mein save bhi hota hai.
 
-### Open Apps Or Websites
+**Try:** `explain quantum computing` · `write a Python calculator`
 
-Example commands:
+## 3. Apps aur Websites Open Karna
 
-- `open chrome`
-- `open youtube`
-- `open calculator`
+Apne installed apps ya saved websites ko naam se open kijiye. Jarvis pehle saved command check karta hai, phir Windows se open karne ki koshish karta hai.
 
-Jarvis checks saved commands in the SQLite database first, then falls back to opening the requested app or URL through Windows.
+**Try:** `open calculator` · `open youtube`
 
-### YouTube Playback
+## 4. YouTube Play
 
-Example command:
+Song, video, ya playlist ka naam boliye. Jarvis YouTube par search karke playback start karega.
 
-- `play perfect on youtube`
+**Try:** `play perfect on youtube` · `play lo-fi music on youtube`
 
-Jarvis extracts the search term and plays it on YouTube using `pywhatkit`.
+## 5. Google Search
 
-### Google Search
+Koi bhi cheez web par khojni ho to direct command boliye. Jarvis aapke default browser mein Google search khol dega.
 
-Example commands:
+**Try:** `search Python tutorial` · `google restaurants near me`
 
-- `search Python tutorial`
-- `google weather in Delhi`
+## 6. Live Weather
 
-Jarvis opens a Google search result page in the browser.
+Apne city ka current temperature aur weather condition poochhiye.
 
-### Weather
+**Try:** `weather in Lucknow` · `what is the weather in Delhi`
 
-Example commands:
+> Weather ke liye `.env` mein `OPENWEATHER_API_KEY` set hona zaroori hai.
 
-- `weather in Lucknow`
-- `what is the weather in Delhi`
+## 7. Memory
 
-Jarvis fetches temperature, weather description, and feels-like temperature from OpenWeather.
+Jarvis ko koi important detail yaad karwaiye aur baad mein wahi detail poochh lijiye. Data aapke local Jarvis database mein rehta hai.
 
-Requires `OPENWEATHER_API_KEY` in `.env`.
+**Try:** `remember my college is XYZ` · `what is my college`
 
-### Memory
+## 8. WhatsApp Actions
 
-Example commands:
+Saved contacts ko WhatsApp message, voice call, ya video call start kijiye.
 
-- `remember my college is XYZ`
-- `what is my college`
+**Try:** `send message to Rahul` · `video call Rahul`
 
-Jarvis stores and recalls simple question-answer memories using `jarvis.db`.
+> Contact aapki local contacts list mein saved hona chahiye.
 
-### WhatsApp Message, Call, And Video Call
+## 9. Secure Access
 
-Example commands:
+Jarvis ko face authentication aur personal pattern lock se secure rakhiye. Pattern change ya remove bhi settings se kiya ja sakta hai.
 
-- `send message to Rahul`
-- `phone call Rahul`
-- `video call Rahul`
+**Try:** `unlock Jarvis` · `change pattern`
 
-Jarvis searches contacts in the database, asks for WhatsApp or mobile preference, and then opens WhatsApp or ADB call actions.
+## Feature UI kaise kholein?
 
-### Mobile Call With ADB
+Main Jarvis screen par chat icon ke paas **grid icon** dabaiye. Wahan har feature ki short explanation aur copy-able example command mil jayegi.
 
-Jarvis can start a phone call through Android Debug Bridge using:
+## Setup Note
 
-```text
-adb shell am start -a android.intent.action.CALL -d tel:<number>
-```
-
-ADB and device setup are required for this feature.
-
-## Authentication
-
-- Face authentication is handled through OpenCV.
-- The assistant starts only after successful face authentication.
-- Face sample/trainer scripts are available under `engine/auth/`.
-
-## Pattern Lock
-
-- Android-style 3x3 pattern lock is shown after face authentication.
-- First-time users must set and confirm a pattern before entering Jarvis.
-- Existing users must draw the saved pattern to unlock Jarvis.
-- Pattern can be changed from the settings button after unlocking.
-- Pattern can be removed from the settings button after unlocking.
-- Change and remove actions require the current pattern first.
-- Pattern data is stored locally in `pattern_lock.json` as a salted SHA-256 hash.
-- `pattern_lock.json` is ignored by Git and should not be uploaded.
-
-## Interface
-
-- Frontend files are in `www/`.
-- Demo screenshots are stored in `www/assets/img/`.
-- Audio startup sound is stored in `www/assets/audio/start_sound.mp3`.
-
-## Environment Variables
-
-Create a local `.env` file from `.env.example` and fill:
-
-```env
-GROQ_API_KEY=your_groq_api_key_here
-OPENWEATHER_API_KEY=your_openweather_api_key_here
-PICOVOICE_ACCESS_KEY=your_picovoice_access_key_here
-```
-
-Do not commit `.env` to GitHub.
-
-## Local Data Files
-
-- `jarvis.db`: local SQLite database for contacts, commands, and memory.
-- `.contact.csv`: local contact import file.
-- `firebase_key.json`: local Firebase credential file if cloud history is used.
-
-These files should stay local and are ignored by Git.
+AI Chat ke liye `.env` mein `GROQ_API_KEY` set kijiye. Aapki private API keys, contacts, memory aur pattern-lock file GitHub par upload nahi honi chahiye.
