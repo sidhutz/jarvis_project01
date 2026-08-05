@@ -170,6 +170,12 @@ body{
     }
   }
 
+.feature-link {
+  display: inline-grid;
+  place-items: center;
+  text-decoration: none;
+}
+
 .chat-canvas{
   background-color: #191919
 }
