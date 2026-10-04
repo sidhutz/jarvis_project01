@@ -53,14 +53,29 @@ def takecommand():
     return query.lower()
 
 @eel.expose
-def loadHistory():
+def loadHistory(limit=100, session_id=None):
     from cloud import get_history
-    data = get_history()
-    print("HISTORY DATA:", data) 
+    data = get_history(limit, session_id)
+    print("HISTORY DATA:", data)
     return data
 
 @eel.expose
-def allCommands(message = 1):
+def listChatSessions():
+    from cloud import list_chat_sessions
+    return list_chat_sessions()
+
+@eel.expose
+def createChatSession(title="New chat"):
+    from cloud import create_chat_session
+    return create_chat_session(title)
+
+@eel.expose
+def chatStorageStatus():
+    from cloud import cloud_status
+    return cloud_status()
+
+@eel.expose
+def allCommands(message = 1, session_id=None):
 
     if message == 1:
         query = takecommand()
@@ -94,8 +109,9 @@ def allCommands(message = 1):
             recallMemory(query)
 
         elif "weather" in query:
-            from engine.feature import getWeather
-            getWeather("lucknow")
+            from engine.feature import extract_city_from_weather_query, getWeather
+            city = extract_city_from_weather_query(query)
+            getWeather(city)
 
         elif "send message" in query or "phone call" in query or "video call" in query:
             from engine.feature import findContact, whatsApp, makeCall
@@ -142,7 +158,11 @@ def allCommands(message = 1):
 
             if reply:
                 speak(reply)
-                save_chat("sidhu", query, reply)
+                active_session_id = save_chat("sidhu", query, reply, session_id)
+                try:
+                    eel.setActiveChatSession(active_session_id)
+                except Exception:
+                    pass
 
     except Exception as e:
         print("error:", e)

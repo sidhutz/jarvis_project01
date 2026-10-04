@@ -352,7 +352,7 @@ $(function () {
 });
 
 function copyCode(btn) {
-    let code = btn.nextElementSibling.innerText;
+    let code = btn.closest(".code-block").querySelector("code").innerText;
     navigator.clipboard.writeText(code);
 
     btn.innerText = "Copied!";
@@ -361,32 +361,294 @@ function copyCode(btn) {
     }, 3000);
 }
 
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function extractCodeFromFence(message) {
+    const match = String(message).match(/```([a-zA-Z0-9_+-]*)\s*([\s\S]*?)```/);
+    if (match) {
+        return {
+            language: match[1].trim(),
+            code: match[2].trim()
+        };
+    }
+
+    return {
+        language: "",
+        code: String(message).replace(/```/g, "").trim()
+    };
+}
+
+function getMessageKind(message, type, options = {}) {
+    if (options.isCode || String(message).includes("```")) {
+        return "code";
+    }
+
+    if (type === "receiver") {
+        return "answer";
+    }
+
+    return "question";
+}
+
+function splitAnswerSections(message) {
+    const text = String(message || "").trim();
+    const outputMatch = text.match(/(?:^|\n)(output|result)\s*:\s*([\s\S]*)/i);
+
+    if (!outputMatch) {
+        return {
+            answer: text,
+            result: ""
+        };
+    }
+
+    return {
+        answer: text.slice(0, outputMatch.index).trim(),
+        result: outputMatch[2].trim()
+    };
+}
+
+function createChatRow(type) {
+    const row = document.createElement("div");
+    row.className = `row ${type === "sender" ? "justify-content-end" : "justify-content-start"} mb-4`;
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "width-size";
+    row.appendChild(wrapper);
+
+    return { row, wrapper };
+}
+
+function renderChatBubble(chatBox, message, type, options = {}) {
+    if (!message || !chatBox) {
+        return;
+    }
+
+    chatBox.querySelectorAll(".chat-empty").forEach(empty => empty.remove());
+    chatBox.querySelectorAll(".chat-welcome").forEach(welcome => welcome.remove());
+
+    const { row, wrapper } = createChatRow(type);
+    const time = options.time || "";
+    const kind = getMessageKind(message, type, options);
+    wrapper.classList.add(`chat-${kind}-wrap`);
+
+    if (kind === "code" && type === "receiver") {
+        const codeBlock = extractCodeFromFence(message);
+        const language = codeBlock.language || "code";
+        wrapper.innerHTML = `
+            <div class="code-block">
+                <div class="code-block-header">
+                    <span>${escapeHtml(language.toUpperCase())}</span>
+                    <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                </div>
+                <pre><code>${escapeHtml(codeBlock.code)}</code></pre>
+                ${time ? `<div class="chat-time">${escapeHtml(time)}</div>` : ""}
+            </div>`;
+    } else {
+        const bubble = document.createElement("div");
+        bubble.className = type === "sender" ? "sender_message" : "receiver_message answer-card";
+
+        if (type === "receiver") {
+            const sections = splitAnswerSections(message);
+            const label = document.createElement("div");
+            label.className = "answer-label";
+            label.textContent = "ANSWER";
+            bubble.appendChild(label);
+
+            const answerText = document.createElement("div");
+            answerText.className = "answer-text";
+            answerText.textContent = sections.answer || message;
+            bubble.appendChild(answerText);
+
+            if (sections.result) {
+                const resultBox = document.createElement("div");
+                resultBox.className = "result-box";
+                resultBox.innerHTML = `
+                    <div class="result-label">RESULT</div>
+                    <pre>${escapeHtml(sections.result)}</pre>`;
+                bubble.appendChild(resultBox);
+            }
+        } else {
+            bubble.textContent = message;
+        }
+
+        if (time) {
+            const meta = document.createElement("div");
+            meta.className = "chat-time";
+            meta.textContent = time;
+            bubble.appendChild(meta);
+        }
+
+        wrapper.appendChild(bubble);
+    }
+
+    chatBox.appendChild(row);
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function speakText(btn) {
+    const text = btn.parentElement.innerText.replace(btn.innerText, "").trim();
+    speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+}
+
 
 
 // ================== CHAT HISTORY LOAD ==================
 
-async function loadChatHistory() {
+let activeChatSessionId = localStorage.getItem("jarvis_active_chat_session") || null;
+
+window.getActiveChatSessionId = function () {
+    return activeChatSessionId;
+};
+
+function saveActiveChatSession(sessionId) {
+    activeChatSessionId = sessionId || null;
+    if (activeChatSessionId) {
+        localStorage.setItem("jarvis_active_chat_session", activeChatSessionId);
+    } else {
+        localStorage.removeItem("jarvis_active_chat_session");
+    }
+}
+
+eel.expose(setActiveChatSession);
+function setActiveChatSession(sessionId) {
+    if (!sessionId) {
+        return;
+    }
+    saveActiveChatSession(sessionId);
+    loadChatSessions();
+}
+
+function formatChatTime(value) {
+    if (!value) {
+        return "";
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return "";
+    }
+
+    return date.toLocaleString([], {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+    });
+}
+
+function renderEmptyChat(message) {
+    const chatBox = document.getElementById("chat-canvas-body");
+    if (!chatBox) {
+        return;
+    }
+
+    chatBox.innerHTML = "";
+    const welcome = document.createElement("div");
+    welcome.className = "chat-welcome";
+    welcome.innerHTML = `
+        <div class="jarvis-chat-orb" aria-hidden="true"><div class="jarvis-chat-orb-core"></div></div>
+        <h2>I'm listening.</h2>
+        <p>${escapeHtml(message || "Ask Jarvis anything to get started.")}</p>`;
+    chatBox.appendChild(welcome);
+}
+
+function renderChatSessions(sessions) {
+    const list = document.getElementById("chat-session-list");
+    if (!list) {
+        return;
+    }
+
+    list.innerHTML = "";
+
+    if (!sessions || sessions.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "chat-empty";
+        empty.textContent = "No chats";
+        list.appendChild(empty);
+        return;
+    }
+
+    sessions.forEach(session => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `chat-session-item ${session.id === activeChatSessionId ? "active" : ""}`;
+        button.innerHTML = `
+            <div class="chat-session-title">${escapeHtml(session.title || "New chat")}</div>
+            <div class="chat-session-meta">${Number(session.message_count || 0)} messages</div>`;
+        button.addEventListener("click", () => {
+            saveActiveChatSession(session.id);
+            renderChatSessions(sessions);
+            loadChatHistory(session.id);
+        });
+        list.appendChild(button);
+    });
+}
+
+async function loadChatSessions() {
     try {
-        let chats = await eel.loadHistory()();
+        const sessions = await eel.listChatSessions()();
+        const activeExists = sessions && sessions.some(session => session.id === activeChatSessionId);
+        if ((!activeChatSessionId || !activeExists) && sessions && sessions.length > 0) {
+            saveActiveChatSession(sessions[0].id);
+        }
 
-        console.log("Chats:", chats);
+        renderChatSessions(sessions || []);
 
+        if (activeChatSessionId) {
+            await loadChatHistory(activeChatSessionId);
+        } else {
+            renderEmptyChat("Start a new chat.");
+        }
+    } catch (err) {
+        console.log("Session list error:", err);
+    }
+}
+
+async function startNewChat() {
+    try {
+        const session = await eel.createChatSession("New chat")();
+        saveActiveChatSession(session.id);
+        await loadChatSessions();
+        renderEmptyChat("New chat ready.");
+    } catch (err) {
+        console.log("New chat error:", err);
+    }
+}
+
+async function loadChatHistory(sessionId = activeChatSessionId) {
+    try {
+        if (!sessionId) {
+            renderEmptyChat("Start a new chat.");
+            return;
+        }
+
+        let chats = await eel.loadHistory(100, sessionId)();
         let chatBox = document.getElementById("chat-canvas-body");
 
-        chats.forEach(chat => {
-            if (chat.message) {
-                let div1 = document.createElement("div");
-                div1.innerHTML = `<div class="sender_message">${chat.message}</div>`;
-                chatBox.appendChild(div1);
-            }
+        chatBox.innerHTML = "";
 
-            if (chat.response) {
-                let div2 = document.createElement("div");
-                div2.innerHTML = `<div class="receiver_message">${chat.response}</div>`;
-                chatBox.appendChild(div2);
-            }
+        if (!chats || chats.length === 0) {
+            renderEmptyChat("No messages in this chat yet.");
+            return;
+        }
+
+        chats.forEach(chat => {
+            const time = formatChatTime(chat.created_at);
+            renderChatBubble(chatBox, chat.message, "sender", { time });
+            renderChatBubble(chatBox, chat.response, "receiver", {
+                time,
+                isCode: String(chat.response || "").includes("```")
+            });
         });
 
+        chatBox.scrollTop = chatBox.scrollHeight;
     } catch (err) {
         console.log("History error:", err);
     }
@@ -394,5 +656,20 @@ async function loadChatHistory() {
 
 // 🚀 सबसे important delay
 setTimeout(() => {
-    loadChatHistory();
+    loadChatSessions();
 }, 4000);
+
+document.addEventListener("DOMContentLoaded", () => {
+    const chatPanel = document.getElementById("offcanvasScrolling");
+    if (chatPanel) {
+        chatPanel.addEventListener("shown.bs.offcanvas", () => {
+            loadChatSessions();
+            document.getElementById("chatbox")?.focus();
+        });
+    }
+
+    const newChatButton = document.getElementById("NewChatBtn");
+    if (newChatButton) {
+        newChatButton.addEventListener("click", startNewChat);
+    }
+});

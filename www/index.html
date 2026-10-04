@@ -312,19 +312,15 @@
                             </div>
                         </div>
                     </div>
-                    <h5 class="text-light text text-center"> Hey Sidhu! Ask me anything</h5>
+                    <h5 class="text-light text text-center">Hey Sidhu! Open chat to ask me anything</h5>
                     <div class="col-md-12 mt-4 pt-4">
                         <div class="text-center">
                             <div id="TextInput" class="d-flex align-items-center">
-                                <input type="text" name="text" id="chatbox" class="input-field"
-                                    placeholder="Type here ...">
-                                <button id="SendBtn" class="glow-on-hover" hidden><i class="bi bi-send"></i></button>
-                                <button id="MicBtn" class="glow-on-hover"><i class="bi bi-mic"></i></button>
                                 <button id="ChatBtn" class="glow-on-hover" data-bs-toggle="offcanvas"
-                                    data-bs-target="#offcanvasScrolling" aria-controls="offcanvasScrolling"><i
+                                    data-bs-target="#offcanvasScrolling" aria-controls="offcanvasScrolling" aria-label="Open Jarvis chat"><i
                                         class="bi bi-chat-dots"></i></button>
                                 <a class="glow-on-hover feature-link" href="features.html" aria-label="View Jarvis features"><i class="bi bi-grid-3x3-gap"></i></a>
-                                <button id="SettingsBtn" class="glow-on-hover"><i class="bi bi-gear"></i></button>
+                                <button id="SettingsBtn" class="glow-on-hover" aria-label="Open settings"><i class="bi bi-gear"></i></button>
                             </div>
                         </div>
                     </div>
@@ -371,15 +367,26 @@
         </div>
     </div>
 
-    <div class="offcanvas offcanvas-start chat-canvas" data-bs-scroll="true" data-bs-backdrop="false" tabindex="-1"
+    <div class="offcanvas offcanvas-start chat-canvas" data-bs-scroll="true" data-bs-backdrop="true" tabindex="-1"
         id="offcanvasScrolling" aria-labelledby="offcanvasScrollingLabel">
         <div class="offcanvas-header">
             <h5 class="offcanvas-title text-white" id="offcanvasScrollingLabel">Chats</h5>
+            <button id="NewChatBtn" class="chat-new-btn" type="button">
+                <i class="bi bi-plus-lg"></i>
+                New Chat
+            </button>
             <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
         </div>
-        <div id="chat-canvas-body" class="offcanvas-body">
-            <!-- Chatting code here -->
-
+        <div class="chat-history-shell">
+            <div id="chat-session-list" class="chat-session-list"></div>
+            <div class="chat-main">
+                <div id="chat-canvas-body" class="offcanvas-body" aria-live="polite"></div>
+                <div id="chat-composer" class="chat-composer">
+                    <input type="text" name="text" id="chatbox" class="input-field" placeholder="Message Jarvis..." autocomplete="off" aria-label="Message Jarvis">
+                    <button id="SendBtn" class="glow-on-hover" aria-label="Send message" hidden><i class="bi bi-send"></i></button>
+                    <button id="MicBtn" class="glow-on-hover" aria-label="Use voice input"><i class="bi bi-mic"></i></button>
+                </div>
+            </div>
         </div>
     </div>
 

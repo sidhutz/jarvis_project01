@@ -41,7 +41,7 @@ $(document).ready(function () {
             eel.playAssistantSound()
             $("#Oval").attr("hidden", true );
             $("#Siriwave").attr("hidden", false );
-            eel.allCommands()()
+            eel.allCommands(1, window.getActiveChatSessionId ? window.getActiveChatSessionId() : null)()
         });
 
          function doc_keyUp(e) {
@@ -50,18 +50,29 @@ $(document).ready(function () {
             eel.playAssistantSound()
             $("#Oval").attr("hidden", true);
             $("#Siriwave").attr("hidden", false);
-            eel.allCommands()()
+            eel.allCommands(1, window.getActiveChatSessionId ? window.getActiveChatSessionId() : null)()
         }
     }
     document.addEventListener('keyup', doc_keyUp, false);
 
-     function PlayAssistant(message) {
+     async function PlayAssistant(message) {
 
         if (message != "") {
 
+            if (window.getActiveChatSessionId && !window.getActiveChatSessionId()) {
+                try {
+                    const session = await eel.createChatSession("New chat")();
+                    if (window.setActiveChatSession) {
+                        window.setActiveChatSession(session.id);
+                    }
+                } catch (err) {
+                    console.log("Could not create chat session:", err);
+                }
+            }
+
             $("#Oval").attr("hidden", true);
             $("#Siriwave").attr("hidden", false);
-            eel.allCommands(message);
+            eel.allCommands(message, window.getActiveChatSessionId ? window.getActiveChatSessionId() : null);
             $("#chatbox").val("")
             $("#MicBtn").attr('hidden', false);
             $("#SendBtn").attr('hidden', true);

@@ -2,20 +2,17 @@ import os
 import re
 from shlex import quote
 import sqlite3
-import struct
 import subprocess
 import time
 import webbrowser
+from datetime import datetime
 from groq import Groq
 
 from playsound import playsound
 import eel
-import pvporcupine
-import pyaudio
 import pyautogui
 from engine.command import speak
 from engine.config import ASSISTEANT_NAME
-import pywhatkit as kit
 from engine.helper import extract_yt_term, remove_words
 
 con = sqlite3.connect("jarvis.db")
@@ -106,58 +103,11 @@ def openCommand(query):
             speak("some thing went wrong")
 
 def PlayYoutube(query):
+    import pywhatkit as kit
+
     search_term = extract_yt_term(query)
     speak("Playing "+search_term+" on YouTube")
     kit.playonyt(search_term)
-
-def hotword():
-    porcupine = None
-    paud = None
-    audio_stream = None
-
-    try:
-        access_key = os.getenv("PICOVOICE_ACCESS_KEY")
-        if not access_key:
-            print("Picovoice access key is missing")
-            return
-
-        porcupine = pvporcupine.create(
-            access_key=access_key,
-            keywords=["jarvis", "alexa"],
-            sensitivities=[0.8, 0.8]
-        )
-
-        paud = pyaudio.PyAudio()
-
-        audio_stream = paud.open(
-            rate=porcupine.sample_rate,
-            channels=1,
-            format=pyaudio.paInt16,
-            input=True,
-            frames_per_buffer=porcupine.frame_length
-        )
-
-        print("Listening for hotword...")
-
-        while True:
-            pcm = audio_stream.read(porcupine.frame_length)
-            pcm = struct.unpack_from("h" * porcupine.frame_length, pcm)
-
-            keyword_index = porcupine.process(pcm)
-
-            if keyword_index >= 0:
-                print("Hotword Detected!")
-
-    except Exception as e:
-        print("Error:", e)
-
-    finally:
-        if porcupine:
-            porcupine.delete()
-        if audio_stream:
-            audio_stream.close()
-        if paud:
-            paud.terminate()
 
 def findContact(query):
     
@@ -216,9 +166,377 @@ def whatsApp(mobile_no, message, flag, name):
 
 client = None
 
+# Groq retires and adds models over time. These are only preferences; the
+# runtime checks the account's own model list before selecting one.
+GROQ_MODEL_PREFERENCES = [
+    "qwen/qwen3-32b",
+    "llama-3.1-8b-instant",
+    "meta-llama/llama-4-scout-17b-16e-instruct",
+    # Some gpt-oss responses attempt tool calls even when Jarvis provides no
+    # tools, so keep it as the final fallback.
+    "openai/gpt-oss-20b",
+]
+
+
+def get_groq_model(excluded_models=None):
+    """Return an accessible Groq chat model, respecting GROQ_MODEL if set."""
+    excluded_models = set(excluded_models or [])
+    configured_model = os.getenv("GROQ_MODEL", "").strip()
+    if configured_model and configured_model not in excluded_models:
+        return configured_model
+
+    try:
+        available_models = [item.id for item in client.models.list().data]
+        for model in GROQ_MODEL_PREFERENCES:
+            if model in available_models and model not in excluded_models:
+                return model
+
+        # Prefer an instruction/chat model if the account offers a newer name.
+        for model in available_models:
+            lower_name = model.lower()
+            if model not in excluded_models and ("instruct" in lower_name or "chat" in lower_name):
+                return model
+
+        for model in available_models:
+            if model not in excluded_models:
+                return model
+    except Exception as exc:
+        print(f"Could not fetch Groq model list: {exc}")
+
+    # Kept only as an offline fallback; normally an account-specific model
+    # selected above is used.
+    return "llama-3.1-8b-instant"
+
+
+def is_tool_use_error(exc):
+    error_text = str(exc).lower()
+    return "tool_use_failed" in error_text or "model called a tool" in error_text
+
+CODE_REQUEST_WORDS = [
+    "code",
+    "program",
+    "script",
+    "function",
+    "html",
+    "css",
+    "javascript",
+    "python",
+    "java",
+    "c++",
+]
+
+CURRENT_INFO_WORDS = [
+    "current",
+    "latest",
+    "today",
+    "todays",
+    "today's",
+    "news",
+    "breaking",
+    "live",
+    "right now",
+    "abhi",
+    "aaj",
+    "taaza",
+    "taza",
+    "naya",
+    "new update",
+    "price",
+    "score",
+    "weather",
+    "date",
+    "time",
+    "chief minister",
+    "cm",
+    "prime minister",
+    "president",
+    "governor",
+    "mayor",
+    "ceo",
+    "incumbent",
+]
+
+OFFICE_LOOKUP_WORDS = [
+    "chief minister",
+    "cm",
+    "prime minister",
+    "president",
+    "governor",
+    "mayor",
+    "ceo",
+    "incumbent",
+]
+
+
+def is_code_request(query):
+    query = (query or "").lower()
+    return any(word in query for word in CODE_REQUEST_WORDS)
+
+
+def is_current_info_request(query):
+    query = (query or "").lower()
+    return any(word in query for word in CURRENT_INFO_WORDS)
+
+
+def is_office_lookup_request(query):
+    query = (query or "").lower()
+    return any(word in query for word in OFFICE_LOOKUP_WORDS)
+
+
+def get_local_current_answer(query):
+    query = (query or "").lower()
+    now = datetime.now()
+
+    asks_date = (
+        "date" in query
+        or "tarikh" in query
+        or "tareekh" in query
+        or "aaj ki date" in query
+        or "today's date" in query
+    )
+    asks_time = "time" in query or "samay" in query
+
+    if asks_date and asks_time:
+        return now.strftime("Current date is %d %B %Y and time is %I:%M %p.")
+    if asks_date and not any(word in query for word in ["news", "latest", "current affairs", "price", "score"]) and not is_office_lookup_request(query):
+        return now.strftime("Today's date is %d %B %Y.")
+    if asks_time:
+        return now.strftime("Current time is %I:%M %p.")
+
+    return ""
+
+
+def clean_search_text(value):
+    value = re.sub(r"\s+", " ", value or "").strip()
+    return value
+
+
+def normalize_office_search_query(query):
+    normalized = (query or "").lower()
+    normalized = re.sub(r"\b(who|what|which)\s+(is|are|was|were)\b", " ", normalized)
+    normalized = re.sub(r"\b(current|latest|today|right now|now|present|incumbent)\b", " ", normalized)
+    normalized = re.sub(r"\b(the|a|an)\b", " ", normalized)
+    normalized = re.sub(r"\bcm\b", "chief minister", normalized)
+    normalized = normalized.replace("?", " ")
+    return clean_search_text(normalized)
+
+
+def build_search_queries(query):
+    query = clean_search_text(query)
+    if not query:
+        return []
+
+    if is_office_lookup_request(query):
+        office_query = normalize_office_search_query(query)
+        queries = [office_query or query]
+        queries.extend([
+            f"{office_query or query} incumbent official",
+            f"{office_query or query} wikipedia",
+            query,
+        ])
+    else:
+        queries = [query]
+
+    unique_queries = []
+    for item in queries:
+        if item not in unique_queries:
+            unique_queries.append(item)
+
+    return unique_queries
+
+
+def search_web_current(query, limit=5):
+    import requests
+    from bs4 import BeautifulSoup
+    from urllib.parse import quote_plus
+    import xml.etree.ElementTree as ET
+
+    search_queries = build_search_queries(query)
+    if not search_queries:
+        return []
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
+    results = []
+
+    primary_query = search_queries[0]
+    should_search_news = (
+        not is_office_lookup_request(primary_query)
+        and ("news" in primary_query.lower() or "latest" in primary_query.lower() or "today" in primary_query.lower())
+    )
+
+    if should_search_news:
+        news_url = f"https://news.google.com/rss/search?q={quote_plus(primary_query)}&hl=en-IN&gl=IN&ceid=IN:en"
+        try:
+            response = requests.get(news_url, headers=headers, timeout=12)
+            response.raise_for_status()
+            root = ET.fromstring(response.content)
+            for item in root.findall(".//item"):
+                title = clean_search_text(item.findtext("title", ""))
+                snippet = clean_search_text(item.findtext("description", ""))
+                link = clean_search_text(item.findtext("link", ""))
+
+                if title:
+                    results.append({
+                        "title": title,
+                        "snippet": re.sub(r"<[^>]+>", "", snippet),
+                        "link": link,
+                    })
+
+                if len(results) >= limit:
+                    return results
+        except Exception as exc:
+            print("Google News search failed:", exc)
+
+    search_urls = []
+    for search_query in search_queries:
+        search_urls.extend([
+            f"https://duckduckgo.com/html/?q={quote_plus(search_query)}",
+            f"https://www.bing.com/search?q={quote_plus(search_query)}",
+        ])
+
+    for url in search_urls:
+        try:
+            response = requests.get(url, headers=headers, timeout=12)
+            response.raise_for_status()
+        except Exception as exc:
+            print("Search request failed:", exc)
+            continue
+
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        if "duckduckgo.com" in url:
+            result_nodes = soup.select(".result")
+            title_selector = ".result__a"
+            snippet_selector = ".result__snippet"
+        else:
+            result_nodes = soup.select("li.b_algo")
+            title_selector = "h2 a"
+            snippet_selector = ".b_caption p"
+
+        for result in result_nodes:
+            title_node = result.select_one(title_selector)
+            snippet_node = result.select_one(snippet_selector)
+
+            if not title_node:
+                continue
+
+            title = clean_search_text(title_node.get_text(" ", strip=True))
+            snippet = clean_search_text(snippet_node.get_text(" ", strip=True) if snippet_node else "")
+            link = title_node.get("href", "")
+
+            if title and (snippet or link):
+                results.append({
+                    "title": title,
+                    "snippet": snippet,
+                    "link": link,
+                })
+
+            if len(results) >= limit:
+                return results
+
+    return results
+
+
+def extract_direct_current_answer(query, web_context):
+    if not web_context or not is_office_lookup_request(query):
+        return ""
+
+    compact_context = clean_search_text(web_context)
+    patterns = [
+        r"\bheaded\s+by\s+([A-Z][A-Za-z .'-]{2,80})\s+who\s+was\s+sworn\s+in\s+as\s+the\s+Chief\s+Minister",
+        r"\b([A-Z][A-Za-z .'-]{2,80})\s+who\s+was\s+sworn\s+in\s+as\s+the\s+Chief\s+Minister",
+        r"\b([A-Z][A-Za-z .'-]{2,80})\s+was\s+sworn\s+in\s+as\s+[^.]{0,80}?Chief\s+Minister",
+        r"\bcurrent\s+[^.]{0,80}?\s+is\s+([A-Z][A-Za-z .'-]{2,80})",
+        r"\bincumbent\s*:\s*([A-Z][A-Za-z .'-]{2,80})",
+        r"\bChief Minister\s+of\s+West\s+Bengal\s*\|\s*([A-Z][A-Za-z .'-]{2,80})",
+        r"\b([A-Z][A-Za-z .'-]{2,80})\s+(?:was sworn in|assumed the office|is the current)",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, compact_context)
+        if match:
+            name = clean_search_text(match.group(1))
+            name = re.split(r"\s+(?:who|which|and|on|from|since|as)\b", name)[0].strip(" .,-")
+            if name and len(name.split()) <= 5:
+                return f"Based on live search results, the current answer is: {name}."
+
+    return ""
+
+
+def build_web_context(query):
+    try:
+        results = search_web_current(query)
+    except Exception as exc:
+        print("Live search failed:", exc)
+        return ""
+
+    if not results:
+        return ""
+
+    lines = []
+    for index, item in enumerate(results, start=1):
+        lines.append(
+            f"{index}. {item['title']}\n"
+            f"Snippet: {item['snippet']}\n"
+            f"Source: {item['link']}"
+        )
+
+    return "\n\n".join(lines)
+
+
+def detect_code_language(query, fallback=""):
+    query = (query or "").lower()
+    language_map = {
+        "python": "python",
+        "html": "html",
+        "css": "css",
+        "javascript": "javascript",
+        "java": "java",
+        "c++": "cpp",
+    }
+
+    for word, language in language_map.items():
+        if word in query:
+            return language
+
+    return fallback
+
+
+def format_code_reply(reply, query=""):
+    reply = (reply or "").strip()
+    code_match = re.search(r"```([a-zA-Z0-9_+-]*)\s*([\s\S]*?)```", reply)
+
+    if code_match:
+        language = detect_code_language(query, code_match.group(1).strip())
+        code = code_match.group(2).strip()
+    else:
+        language = detect_code_language(query)
+        lines = []
+        for line in reply.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                if lines:
+                    lines.append("")
+                continue
+            if stripped.lower().startswith(("output:", "result:", "explanation:", "here is", "sure,")):
+                continue
+            lines.append(line.rstrip())
+        code = "\n".join(lines).strip()
+
+    language_tag = language or ""
+    return f"```{language_tag}\n{code}\n```" if code else ""
+
+
 def chatBot(query):
     try:
         global client
+        local_current_answer = get_local_current_answer(query)
+        if local_current_answer:
+            print(local_current_answer)
+            return local_current_answer
+
         api_key = os.getenv("GROQ_API_KEY")
 
         if not api_key:
@@ -228,28 +546,75 @@ def chatBot(query):
         if client is None:
             client = Groq(api_key=api_key)
 
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-            {"role": "system", "content": "You are Jarvis AI. If the user asks for code, respond ONLY with clean code inside one proper triple-backtick code block. Do not add explanations, headings, markdown outside the code block, or extra text."},
-            {"role": "user", "content": query}
-            ]
+        today = datetime.now().strftime("%d %B %Y")
+        web_context = ""
+        if is_current_info_request(query) and not is_code_request(query):
+            web_context = build_web_context(query)
+            direct_answer = extract_direct_current_answer(query, web_context)
+            if direct_answer:
+                print(direct_answer)
+                return direct_answer
+
+        system_prompt = (
+            "You are Jarvis AI. "
+            f"Today's date is {today}. "
+            "For current, latest, today, news, price, score, or live-data questions, use the provided live web context. "
+            "If live web context is present, answer from it directly. If live web context is missing or truly insufficient, clearly say that live data could not be fetched instead of guessing from old knowledge. "
+            "You have no tools or function-calling capability. Never attempt to call web.run, a browser, a function, or any other tool. "
+            "When the user asks for code, respond with ONLY one clean triple-backtick code block. Put the complete corrected code inside it. "
+            "Do not include output, explanation, headings, comments about the code, or any text outside the code block."
         )
 
-        reply = response.choices[0].message.content
-        code_words = ["code", "program", "script", "function", "html", "css", "javascript", "python", "java", "c++"]
+        user_content = query
+        if web_context:
+            user_content = (
+                f"User question: {query}\n\n"
+                f"Live web context:\n{web_context}\n\n"
+                "Answer in a short, clear way. Mention that it is based on live search results."
+            )
 
-        if any(word in query.lower() for word in code_words):
-            code_match = re.search(r"```[a-zA-Z0-9_+-]*\s*([\s\S]*?)```", reply)
-            if code_match:
-                reply = "```\n" + code_match.group(1).strip() + "\n```"
+        model = get_groq_model()
+        print(f"Using Groq model: {model}")
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content},
+        ]
+        try:
+            response = client.chat.completions.create(model=model, messages=messages)
+        except Exception as exc:
+            if not is_tool_use_error(exc):
+                raise
+
+            fallback_model = get_groq_model(excluded_models=[model])
+            print(f"Model {model} attempted a tool call; retrying with {fallback_model}")
+            response = client.chat.completions.create(model=fallback_model, messages=messages)
+
+        reply = response.choices[0].message.content
+
+        if is_current_info_request(query) and not is_code_request(query) and not web_context:
+            reply = "I could not fetch live current data right now. Please check your internet connection and try again."
+
+        if is_code_request(query):
+            reply = format_code_reply(reply, query)
 
         print(reply)
         return reply
 
-    except Exception as e:
-        speak("Error connecting to AI")
-        print(e)
+    except Exception as exc:
+        # Return a message so the UI does not appear stuck when the AI request fails.
+        error_name = type(exc).__name__
+        error_text = str(exc).lower()
+        print(f"Groq AI request failed ({error_name}): {exc}")
+
+        if "authentication" in error_name.lower() or "api key" in error_text or "invalid api key" in error_text:
+            return "AI key is invalid or expired. Add a new GROQ_API_KEY in the .env file, then restart Jarvis."
+        if "rate" in error_name.lower() or "rate limit" in error_text or "429" in error_text:
+            return "AI is temporarily rate-limited. Please wait a moment and try again."
+        if "model_not_found" in error_text or "does not exist" in error_text or "do not have access" in error_text:
+            return "The configured AI model is unavailable. Remove GROQ_MODEL from .env and restart Jarvis so it can select an available model automatically."
+        if "connection" in error_name.lower() or "timeout" in error_text or "network" in error_text:
+            return "Jarvis could not reach the AI service. Check your internet, firewall, or proxy connection and try again."
+        return "AI request failed. Please check the Jarvis console for the detailed error and try again."
 
 def makeCall(name, mobileNo):
     mobileNo =mobileNo.replace(" ", "")
